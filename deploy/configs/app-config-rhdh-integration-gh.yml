@@ -1,0 +1,41 @@
+app:
+  title: Red Hat Developer Hub
+integrations:
+  github:
+    - host: github.com
+      apps:
+        - appId: ${GITHUB_APP_APP_ID}
+          clientId: ${GITHUB_APP_CLIENT_ID}
+          clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+          webhookUrl: ${GITHUB_APP_WEBHOOK_URL}
+          webhookSecret: ${GITHUB_APP_WEBHOOK_SECRET}
+          privateKey: |
+            ${GITHUB_APP_PRIVATE_KEY}
+auth:
+  # see https://backstage.io/docs/auth/ to learn about auth providers
+  environment: development
+  providers:
+    github:
+      development:
+        clientId: ${GITHUB_APP_CLIENT_ID}
+        clientSecret: ${GITHUB_APP_CLIENT_SECRET}
+
+# update your github organization name and uncomment to enable discovery
+# see full configuration info here https://backstage.io/docs/integrations/github/discovery/#configuration
+# this requires the above configured github integration
+catalog:
+  providers:
+    # this enables org repos discovery looking for catalog-info.yaml files
+    github:
+      myAwesomeOrgId:
+        # update your organization name
+        organization: tomerfi-playground
+    # this enables org member discovery
+    githubOrg:
+      default:
+        id: development
+        # update you organization url
+        orgUrl: https://github.com/tomerfi-playground
+
+enabled:
+  github: ${GITHUB_ENABLED}
