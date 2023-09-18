@@ -1,0 +1,265 @@
+---
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: backstage
+parameters:
+- name: IMAGE
+  value: quay.io/janus-idp/redhat-backstage-build
+- name: IMAGE_TAG
+  value: latest
+- name: DB_SECRET_NAME
+  value: backstage-db
+objects:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: backstage
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: backstage
+  labels:
+    app.kubernetes.io/name: backstage
+  spec:
+    type: ClusterIP
+    ports:
+      - name: http-backend
+        port: 7007
+        targetPort: backend
+        protocol: TCP
+    selector:
+      app.kubernetes.io/name: backstage
+- kind: Service
+  apiVersion: v1
+  spec:
+    ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+    selector:
+      deployment: postgresql
+  metadata:
+    name: postgresql
+    labels:
+      app: postgresql
+- kind: Deployment
+  apiVersion: apps/v1
+  metadata:
+    name: postgresql
+    labels:
+      app: postgresql
+      deployment: postgresql
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        deployment: postgresql
+    template:
+      metadata:
+        labels:
+          app: postgresql
+          deployment: postgresql
+      spec:
+        containers:
+        - name: postgresql
+          image: registry.redhat.io/rhel9/postgresql-15:latest
+          ports:
+          - containerPort: 5432
+            protocol: TCP
+          env:
+            - name: BITNAMI_DEBUG
+              value: 'false'
+            - name: POSTGRESQL_PORT_NUMBER
+              value: '5432'
+            - name: POSTGRESQL_VOLUME_DIR
+              value: /var/lib/pgsql/data
+            - name: PGDATA
+              value: /var/lib/pgsql/data/userdata
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-postgresql
+                  key: postgres-password
+            - name: POSTGRES_DB
+              value: backstage_plugin_catalog
+            - name: POSTGRESQL_ENABLE_LDAP
+              value: 'no'
+            - name: POSTGRESQL_ENABLE_TLS
+              value: 'no'
+            - name: POSTGRESQL_LOG_HOSTNAME
+              value: 'false'
+            - name: POSTGRESQL_LOG_CONNECTIONS
+              value: 'false'
+            - name: POSTGRESQL_LOG_DISCONNECTIONS
+              value: 'false'
+            - name: POSTGRESQL_PGAUDIT_LOG_CATALOG
+              value: 'off'
+            - name: POSTGRESQL_CLIENT_MIN_MESSAGES
+              value: error
+            - name: POSTGRESQL_SHARED_PRELOAD_LIBRARIES
+              value: pgaudit
+            - name: POSTGRESQL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backstage-postgresql
+                  key: postgres-password
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+        restartPolicy: Always
+    strategy:
+      type: RollingUpdate
+      rollingUpdate:
+        maxUnavailable: 25%
+        maxSurge: 25%
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: backstage
+    labels: 
+      app.kubernetes.io/name: backstage
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app.kubernetes.io/name: backstage
+    template:
+      metadata:
+        labels:
+          app.kubernetes.io/name: backstage
+      spec:
+        serviceAccountName: backstage
+        volumes:
+          - name: backstage-app-config
+            configMap:
+              name: backstage-app-config
+              defaultMode: 420
+        containers:
+        - name: backstage
+          image: ${IMAGE}:${IMAGE_TAG}
+          imagePullPolicy: "Always"
+          volumeMounts:
+            - name: backstage-app-config
+              mountPath: /app/app-config-from-configmap.yaml
+              subPath: app-config.yaml
+          command:
+          - node
+          - packages/backend
+          args:
+            - '--config'
+            - /app/app-config-from-configmap.yaml
+          env:
+          - name: APP_CONFIG_backend_listen_port
+            value: '7007'
+          - name: POSTGRES_HOST
+            value: postgresql
+          - name: POSTGRES_PORT
+            value: '5432'
+          - name: POSTGRES_USER
+            value: postgres
+          - name: POSTGRES_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: backstage-postgresql
+                key: password
+          - name: POSTGRESQL_ADMIN_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: backstage-postgresql
+                key: postgres-password
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: backstage-github
+                key: token
+          - name: AUTH_GITHUB_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: backstage-github
+                key: client-id
+          - name: AUTH_GITHUB_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: backstage-github
+                key: client-secret
+          ports:
+          - name: backend
+            containerPort: 7007
+            protocol: TCP
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: backstage-postgresql
+    labels:
+      app.kubernetes.io/name: postgresql
+  data:
+    password: eTVkTkprRUNOTw==
+    postgres-password: YzlKVndNQ3lJTg==
+  type: Opaque
+
+- kind: Secret
+  apiVersion: v1
+  metadata:
+    name: backstage-github
+  data:
+    client-id: NGIyODY2ZWMzYjQ3YzY1OGZhNDY=
+    client-secret: ZjYxZWJmMTQ1NmY2NDdlZDFmNjJhM2MwYjhjMGNiYjdmNTk4ZWEwNQ==
+    token: UTNndmJzVnl3VU1hdjI1d2Ixc2g=
+  type: Opaque
+
+- kind: ConfigMap
+  apiVersion: v1
+  metadata:
+    name: backstage-app-config
+  data:
+    app-config.yaml: |
+      app:
+        baseUrl: https://backstage-manual-route-ahameed-janus.apps.rhdh-dev01.kni.syseng.devcluster.openshift.com
+      backend:
+        baseUrl: https://backstage-manual-route-ahameed-janus.apps.rhdh-dev01.kni.syseng.devcluster.openshift.com
+        cors:
+          origin: https://backstage-manual-route-ahameed-janus.apps.rhdh-dev01.kni.syseng.devcluster.openshift.com
+        database:
+            client: pg
+            connection:
+              host: ${POSTGRES_HOST}
+              port: ${POSTGRES_PORT}
+              user: ${POSTGRES_USER}
+              password: ${POSTGRESQL_ADMIN_PASSWORD}
+      auth:
+        environment: production
+        providers:
+          github:
+            production:
+              clientId:  ${AUTH_GITHUB_CLIENT_ID}
+              clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+          oauth2Proxy: {}
+      
+      integrations:
+        github:
+          - host: github.com
+            token: ${GITHUB_TOKEN}
+      
+      techdocs:
+        builder: external
+        generator:
+          runIn: local
+
+      catalog:
+        import:
+          entityFilename: catalog-info.yaml
+          pullRequestBranchName: backstage-integration
+        rules:
+          - allow: [Component, System, Group, Resource, Location, Template, API]
+        locations:
+          # Note: integrations.github[].apps must be correctly configured to read GitHub locations
+          - type: file
+            target: ../../catalog-entities/all.yaml
