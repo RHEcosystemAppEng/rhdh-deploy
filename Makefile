@@ -294,9 +294,9 @@ endif
 
  DEV_NAMESPACE ?= ${USER}-backstage
  GITHUB_ORGANIZATION  ?= appeng-backstage
- AUTH_GITHUB_CLIENT_ID ?= '4b2866ec3b47c658fa46'
+ AUTH_GITHUB_CLIENT_ID ?= ''
  AUTH_GITHUB_CLIENT_SECRET ?= ''
- HOSTNAME ?=  apps..devcluster.openshift.com
+ HOSTNAME ?=  $(strip $(call get_cluster_addr))
 
 .PHONY: template/apply
 template/apply:
