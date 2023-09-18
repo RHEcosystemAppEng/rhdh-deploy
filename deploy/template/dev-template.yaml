@@ -4,23 +4,41 @@ apiVersion: template.openshift.io/v1
 metadata:
   name: backstage
 parameters:
+- name: NAME
+  value: backstage
+  displayName: Name
+  description: 'Custom name for backstage/janus deployment, route ,  etc'
 - name: IMAGE
   value: quay.io/janus-idp/redhat-backstage-build
 - name: IMAGE_TAG
   value: latest
-- name: DB_SECRET_NAME
-  value: backstage-db
+- name: HOSTNAME
+  value: ''
+  displayName: Custom https Route/Janus Hostname
+  description: 'Custom hostname for backstage/janus front-end/back-end calls for example :  apps.<>.devcluster.openshift.com'
+  required: false
+- name: DEV_NAMESPACE
+  value: ahameed-janus
+- name : GITHUB_ORGANIZATION
+  value: appeng-backstage
+- name : AUTH_GITHUB_CLIENT_ID
+  value: ''
+- name: AUTH_GITHUB_CLIENT_SECRET
+  value: ''
+
 objects:
 - apiVersion: v1
   kind: ServiceAccount
   metadata:
-    name: backstage
+    name: ${NAME}
+    namespace: ${DEV_NAMESPACE}
 - apiVersion: v1
   kind: Service
   metadata:
-    name: backstage
+    name: ${NAME}
+    namespace: ${DEV_NAMESPACE}
   labels:
-    app.kubernetes.io/name: backstage
+    app.kubernetes.io/name: ${NAME}
   spec:
     type: ClusterIP
     ports:
@@ -29,7 +47,7 @@ objects:
         targetPort: backend
         protocol: TCP
     selector:
-      app.kubernetes.io/name: backstage
+      app.kubernetes.io/name: ${NAME}
 - kind: Service
   apiVersion: v1
   spec:
@@ -42,12 +60,14 @@ objects:
       deployment: postgresql
   metadata:
     name: postgresql
+    namespace: ${DEV_NAMESPACE}
     labels:
       app: postgresql
 - kind: Deployment
   apiVersion: apps/v1
   metadata:
     name: postgresql
+    namespace: ${DEV_NAMESPACE}
     labels:
       app: postgresql
       deployment: postgresql
@@ -123,27 +143,28 @@ objects:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: backstage
+    name: ${NAME}
+    namespace: ${DEV_NAMESPACE}
     labels: 
-      app.kubernetes.io/name: backstage
+      app.kubernetes.io/name: ${NAME}
   spec:
     replicas: 1
     selector:
       matchLabels:
-        app.kubernetes.io/name: backstage
+        app.kubernetes.io/name: ${NAME}
     template:
       metadata:
         labels:
-          app.kubernetes.io/name: backstage
+          app.kubernetes.io/name: ${NAME}
       spec:
-        serviceAccountName: backstage
+        serviceAccountName: ${NAME}
         volumes:
           - name: backstage-app-config
             configMap:
               name: backstage-app-config
               defaultMode: 420
         containers:
-        - name: backstage
+        - name: ${NAME}
           image: ${IMAGE}:${IMAGE_TAG}
           imagePullPolicy: "Always"
           volumeMounts:
@@ -180,16 +201,19 @@ objects:
               secretKeyRef:
                 name: backstage-github
                 key: token
+                optional: true
           - name: AUTH_GITHUB_CLIENT_ID
             valueFrom:
               secretKeyRef:
                 name: backstage-github
                 key: client-id
+                optional: true
           - name: AUTH_GITHUB_CLIENT_SECRET
             valueFrom:
               secretKeyRef:
                 name: backstage-github
                 key: client-secret
+                optional: true
           ports:
           - name: backend
             containerPort: 7007
@@ -198,6 +222,7 @@ objects:
   apiVersion: v1
   metadata:
     name: backstage-postgresql
+    namespace: ${DEV_NAMESPACE}
     labels:
       app.kubernetes.io/name: postgresql
   data:
@@ -209,24 +234,44 @@ objects:
   apiVersion: v1
   metadata:
     name: backstage-github
+    namespace: ${DEV_NAMESPACE}
   data:
-    client-id: NGIyODY2ZWMzYjQ3YzY1OGZhNDY=
-    client-secret: ZjYxZWJmMTQ1NmY2NDdlZDFmNjJhM2MwYjhjMGNiYjdmNTk4ZWEwNQ==
-    token: UTNndmJzVnl3VU1hdjI1d2Ixc2g=
+    client-id: ${AUTH_GITHUB_CLIENT_ID}
+    client-secret: ${AUTH_GITHUB_CLIENT_SECRET}
   type: Opaque
+
+- kind: Route
+  apiVersion: route.openshift.io/v1
+  metadata:
+    name: ${NAME}
+    namespace: ${DEV_NAMESPACE}
+    annotations:
+      openshift.io/host.generated: 'true'
+  spec:
+    to:
+      kind: Service
+      name: ${NAME}
+      weight: 100
+    port:
+      targetPort: http-backend
+    tls:
+      termination: edge
+      insecureEdgeTerminationPolicy: Allow
+    wildcardPolicy: None
 
 - kind: ConfigMap
   apiVersion: v1
   metadata:
     name: backstage-app-config
+    namespace: ${DEV_NAMESPACE}
   data:
     app-config.yaml: |
       app:
-        baseUrl: https://backstage-manual-route-ahameed-janus.apps.rhdh-dev01.kni.syseng.devcluster.openshift.com
+        baseUrl: https://${NAME}-${DEV_NAMESPACE}.${HOSTNAME}
       backend:
-        baseUrl: https://backstage-manual-route-ahameed-janus.apps.rhdh-dev01.kni.syseng.devcluster.openshift.com
+        baseUrl: https://${NAME}-${DEV_NAMESPACE}.${HOSTNAME}
         cors:
-          origin: https://backstage-manual-route-ahameed-janus.apps.rhdh-dev01.kni.syseng.devcluster.openshift.com
+          origin: https://${NAME}-${DEV_NAMESPACE}.${HOSTNAME}
         database:
             client: pg
             connection:
@@ -234,14 +279,18 @@ objects:
               port: ${POSTGRES_PORT}
               user: ${POSTGRES_USER}
               password: ${POSTGRESQL_ADMIN_PASSWORD}
+      
+      organization:
+        name: ${GITHUB_ORGANIZATION}
+      
       auth:
-        environment: production
+        environment: development
         providers:
           github:
-            production:
+            development:
               clientId:  ${AUTH_GITHUB_CLIENT_ID}
               clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
-          oauth2Proxy: {}
+   
       
       integrations:
         github:
