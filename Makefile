@@ -286,3 +286,27 @@ verify/tools/yq:
 ifeq (,$(shell which $(BIN_YQ) 2> /dev/null ))
 	$(error $(call TOOL_MISSING_ERR_MSG,yq,BIN_YQ))
 endif
+
+
+########################################################
+# Makefile section for deploying backstage using openshift template #
+########################################################
+
+ DEV_NAMESPACE ?= ${USER}-backstage
+ GITHUB_ORGANIZATION  ?= appeng-backstage
+ AUTH_GITHUB_CLIENT_ID ?= ''
+ AUTH_GITHUB_CLIENT_SECRET ?= ''
+ HOSTNAME ?=  $(strip $(call get_cluster_addr))
+
+.PHONY: template/apply
+template/apply:
+	@if ! oc get project $(DEV_NAMESPACE) >/dev/null 2>&1; then \
+		oc new-project $(DEV_NAMESPACE); \
+		oc process -f deploy/template/dev-template.yaml  -p DEV_NAMESPACE=$(DEV_NAMESPACE) -p HOSTNAME=$(HOSTNAME) -p GITHUB_ORGANIZATION= $(GITHUB_ORGANIZATION)  -p AUTH_GITHUB_CLIENT_ID=$(AUTH_GITHUB_CLIENT_ID) -p  AUTH_GITHUB_CLIENT_SECRET=$(AUTH_GITHUB_CLIENT_SECRET)  | oc create --save-config -n $(DEV_NAMESPACE) -f -; \
+	else \
+		oc process -f deploy/template/dev-template.yaml -p DEV_NAMESPACE=$(DEV_NAMESPACE) -p HOSTNAME=$(HOSTNAME) -p GITHUB_ORGANIZATION=$(GITHUB_ORGANIZATION)  -p AUTH_GITHUB_CLIENT_ID=$(AUTH_GITHUB_CLIENT_ID)  -p AUTH_GITHUB_CLIENT_SECRET=$(AUTH_GITHUB_CLIENT_SECRET) | oc apply -n $(DEV_NAMESPACE) -f -; \
+	fi
+
+.PHONY: template/clean
+template/clean:
+	oc process -f deploy/template/dev-template.yaml -p DEV_NAMESPACE=$(DEV_NAMESPACE)  | oc -n $(DEV_NAMESPACE) delete -f -
