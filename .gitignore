@@ -1,4 +1,4 @@
 # note the order of the next secrets records
-deploy/secrets/*
+# deploy/secrets/*
 !deploy/secrets/.gitkeep
 values.yaml
