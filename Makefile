@@ -297,6 +297,7 @@ endif
  AUTH_GITHUB_CLIENT_ID ?= ''
  AUTH_GITHUB_CLIENT_SECRET ?= ''
  HOSTNAME ?=  $(strip $(call get_cluster_addr))
+ GITHUB_TOKEN ?=
 
 .PHONY: template/apply
 template/apply:
