@@ -293,19 +293,22 @@ endif
 ########################################################
 
  DEV_NAMESPACE ?= ${USER}-backstage
- GITHUB_ORGANIZATION  ?= appeng-backstage
- AUTH_GITHUB_CLIENT_ID ?= ''
- AUTH_GITHUB_CLIENT_SECRET ?= ''
  HOSTNAME ?=  $(strip $(call get_cluster_addr))
+  GITHUB_ORGANIZATION  ?= appeng-backstage
+
+ # Github Authentication
+
+ AUTH_GITHUB_CLIENT_ID ?=
+ AUTH_GITHUB_CLIENT_SECRET ?=
  GITHUB_TOKEN ?=
 
 .PHONY: template/apply
 template/apply:
 	@if ! oc get project $(DEV_NAMESPACE) >/dev/null 2>&1; then \
 		oc new-project $(DEV_NAMESPACE); \
-		oc process -f deploy/template/dev-template.yaml  -p DEV_NAMESPACE=$(DEV_NAMESPACE) -p HOSTNAME=$(HOSTNAME) -p GITHUB_ORGANIZATION= $(GITHUB_ORGANIZATION)  -p AUTH_GITHUB_CLIENT_ID=$(AUTH_GITHUB_CLIENT_ID) -p  AUTH_GITHUB_CLIENT_SECRET=$(AUTH_GITHUB_CLIENT_SECRET)  | oc create --save-config -n $(DEV_NAMESPACE) -f -; \
+		oc process -f deploy/template/dev-template.yaml  -p DEV_NAMESPACE=$(DEV_NAMESPACE) -p HOSTNAME=$(HOSTNAME) -p GITHUB_ORGANIZATION= $(GITHUB_ORGANIZATION)  -p AUTH_GITHUB_CLIENT_ID=$(AUTH_GITHUB_CLIENT_ID) -p  AUTH_GITHUB_CLIENT_SECRET=$(AUTH_GITHUB_CLIENT_SECRET) -p GITHUB_TOKEN=$(GITHUB_TOKEN) | oc create --save-config -n $(DEV_NAMESPACE) -f -; \
 	else \
-		oc process -f deploy/template/dev-template.yaml -p DEV_NAMESPACE=$(DEV_NAMESPACE) -p HOSTNAME=$(HOSTNAME) -p GITHUB_ORGANIZATION=$(GITHUB_ORGANIZATION)  -p AUTH_GITHUB_CLIENT_ID=$(AUTH_GITHUB_CLIENT_ID)  -p AUTH_GITHUB_CLIENT_SECRET=$(AUTH_GITHUB_CLIENT_SECRET) | oc apply -n $(DEV_NAMESPACE) -f -; \
+		oc process -f deploy/template/dev-template.yaml -p DEV_NAMESPACE=$(DEV_NAMESPACE) -p HOSTNAME=$(HOSTNAME) -p GITHUB_ORGANIZATION=$(GITHUB_ORGANIZATION)  -p AUTH_GITHUB_CLIENT_ID=$(AUTH_GITHUB_CLIENT_ID)  -p AUTH_GITHUB_CLIENT_SECRET=$(AUTH_GITHUB_CLIENT_SECRET) -p GITHUB_TOKEN=$(GITHUB_TOKEN) | oc apply -n $(DEV_NAMESPACE) -f -; \
 	fi
 
 .PHONY: template/clean

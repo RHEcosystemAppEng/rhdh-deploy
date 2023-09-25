@@ -18,14 +18,15 @@ parameters:
   description: 'Custom hostname for backstage/janus front-end/back-end calls for example :  apps.<>.devcluster.openshift.com'
   required: false
 - name: DEV_NAMESPACE
-  value: ahameed-janus
+  value: appeng-janus
 - name : GITHUB_ORGANIZATION
   value: appeng-backstage
 - name : AUTH_GITHUB_CLIENT_ID
   value: ''
 - name: AUTH_GITHUB_CLIENT_SECRET
   value: ''
-
+- name: GITHUB_TOKEN
+  value: ''
 objects:
 - apiVersion: v1
   kind: ServiceAccount
@@ -235,9 +236,10 @@ objects:
   metadata:
     name: backstage-github
     namespace: ${DEV_NAMESPACE}
-  data:
+  stringData:
     client-id: ${AUTH_GITHUB_CLIENT_ID}
     client-secret: ${AUTH_GITHUB_CLIENT_SECRET}
+    client-token: ${GITHUB_TOKEN}
   type: Opaque
 
 - kind: Route
@@ -315,7 +317,7 @@ objects:
           - type: url
             target: https://github.com/appeng-backstage/backstage/blob/main/catalog-info.yaml
           - type: url
-            target: https://github.com/janus-idp/software-templates/blob/main/showcase-templates.yaml      
+            target: https://github.com/appeng-backstage/software-templates/blob/main/showcase-templates.yaml      
           
       
 
